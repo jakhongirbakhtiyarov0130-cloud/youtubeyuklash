@@ -6,12 +6,14 @@ from fastapi import FastAPI, Request
 from aiogram.types import Update
 from contextlib import asynccontextmanager
 from utils import download_video, download_audio
+from dotenv import load_dotenv
+
+# .env faylini yuklash
+load_dotenv()
 
 # Sozlamalar
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 # Render yoki Hugging Face-dan keladigan avtomat URL
-# Render-da bu: RENDER_EXTERNAL_URL
-# Hugging Face-da bu: SPACE_ID orqali yasaymiz
 BASE_URL = os.getenv("RENDER_EXTERNAL_URL") 
 
 logging.basicConfig(level=logging.INFO)
@@ -66,7 +68,6 @@ async def setup_webhook():
         try:
             socket.gethostbyname("api.telegram.org")
             
-            # URL-ni aniqlash
             webhook_url = ""
             if os.getenv("RENDER_EXTERNAL_URL"):
                 webhook_url = f"{os.getenv('RENDER_EXTERNAL_URL')}{WEBHOOK_PATH}"
@@ -77,9 +78,15 @@ async def setup_webhook():
             if webhook_url:
                 logger.info(f"Setting webhook: {webhook_url}")
                 await bot.set_webhook(url=webhook_url, drop_pending_updates=True)
-                logger.info("Bot Muvaffaqiyatli ulandi! ✅")
+                logger.info("Bot Webhook orqali ishga tushdi! ✅")
                 break
-        except:
+            else:
+                logger.info("Webhook URL topilmadi. Polling rejimiga o'tilmoqda...")
+                await bot.delete_webhook(drop_pending_updates=True)
+                await dp.start_polling(bot)
+                break
+        except Exception as e:
+            logger.error(f"Xatolik: {e}")
             await asyncio.sleep(10)
 
 @asynccontextmanager
@@ -88,8 +95,14 @@ async def lifespan(app: FastAPI):
     yield
     await bot.session.close()
 
-# FastAPI lifespan event handler setup for newer versions
 app.router.lifespan_context = lifespan
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 7860)))
+    port = int(os.environ.get("PORT", 7860))
+    # Agar webhook URL bo'lsa FastAPI ishga tushadi, aks holda polling
+    if os.getenv("RENDER_EXTERNAL_URL") or os.getenv("SPACE_ID"):
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    else:
+        # Lokal polling uchun FastAPI kerakmas, lekin xatolik bo'lmasligi uchun setup_webhook dan foydalanamiz
+        asyncio.run(setup_webhook())
+
