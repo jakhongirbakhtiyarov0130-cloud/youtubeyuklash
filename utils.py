@@ -14,8 +14,7 @@ async def download_video(url: str, output_path: str = "downloads"):
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = await asyncio.to_thread(ydl.extract_info, url, download=True)
-        filename = ydl.prepare_filename(info)
-        return filename
+        return ydl.prepare_filename(info)
 
 async def download_audio(url: str, output_path: str = "downloads"):
     if not os.path.exists(output_path):
@@ -33,9 +32,6 @@ async def download_audio(url: str, output_path: str = "downloads"):
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        # Note: FFmpeg is required for MP3 conversion
         info = await asyncio.to_thread(ydl.extract_info, url, download=True)
-        # yt-dlp might change extension to mp3 after postprocessing
-        base_filename = ydl.prepare_filename(info)
-        filename = os.path.splitext(base_filename)[0] + ".mp3"
-        return filename
+        base = ydl.prepare_filename(info)
+        return os.path.splitext(base)[0] + ".mp3"
